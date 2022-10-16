@@ -1,0 +1,10 @@
+*.pyc
+__pycache__
+*.txt
+logs
+*.ckpt
+trains
+regs
+train
+areg
+*egg-info
