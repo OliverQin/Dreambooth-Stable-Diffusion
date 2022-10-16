@@ -35,7 +35,7 @@ def load_model_from_config(config, ckpt, verbose=False):
         print("unexpected keys:")
         print(u)
 
-    model.cuda()
+    model.cpu()
     return model
 
 def get_parser(**parser_kwargs):
@@ -112,7 +112,7 @@ def get_parser(**parser_kwargs):
         "-s",
         "--seed",
         type=int,
-        default=23,
+        default=39725,
         help="seed for seed_everything",
     )
     parser.add_argument(
@@ -723,9 +723,9 @@ if __name__ == "__main__":
                     # "log_momentum": True
                 }
             },
-            "cuda_callback": {
-                "target": "main.CUDACallback"
-            },
+            # "cuda_callback": {
+            #     "target": "main.CUDACallback"
+            # },
         }
         if version.parse(pl.__version__) >= version.parse('1.4.0'):
             default_callbacks_cfg.update({'checkpoint_callback': modelckpt_cfg})

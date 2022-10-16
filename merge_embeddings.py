@@ -67,9 +67,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.stable_diffusion:
-        embedder = FrozenCLIPEmbedder().cuda()
+        embedder = FrozenCLIPEmbedder().cpu()
     else:
-        embedder = BERTEmbedder(n_embed=1280, n_layer=32).cuda()
+        embedder = BERTEmbedder(n_embed=1280, n_layer=32).cpu()
 
     EmbeddingManager = partial(EmbeddingManager, embedder, ["*"])
 
