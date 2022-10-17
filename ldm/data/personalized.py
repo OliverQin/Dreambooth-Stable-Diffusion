@@ -152,6 +152,7 @@ class PersonalizedBase(Dataset):
         self.data_root = data_root
 
         self.image_paths = [os.path.join(self.data_root, file_path) for file_path in os.listdir(self.data_root)]
+        self.image_paths = [i for i in self.image_paths if any(i.lower().endswith(j) for j in ['.jpg', '.jpeg', '.png'])]
         self.image_paths.sort()
 
         # self._length = len(self.image_paths)
