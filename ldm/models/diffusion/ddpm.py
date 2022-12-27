@@ -1521,8 +1521,11 @@ class LatentDiffusion(DDPM):
 class DiffusionWrapper(pl.LightningModule):
     def __init__(self, diff_model_config, conditioning_key):
         super().__init__()
+        print('Loading Diffusion Model')
         self.diffusion_model = instantiate_from_config(diff_model_config)
+        print('Loaded Successfully Diffusion Model')
         self.conditioning_key = conditioning_key
+        print('Condi Key', conditioning_key)
         assert self.conditioning_key in [None, 'concat', 'crossattn', 'hybrid', 'adm']
 
     def forward(self, x, t, c_concat: list = None, c_crossattn: list = None):

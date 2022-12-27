@@ -1,3 +1,5 @@
+import time
+
 from abc import abstractmethod
 from functools import partial
 import math
@@ -27,6 +29,8 @@ def convert_module_to_f16(x):
 def convert_module_to_f32(x):
     pass
 
+def _num_params_of_model(model):
+    return sum(p.numel() for p in model.parameters())
 
 ## go
 class AttentionPool2d(nn.Module):
@@ -80,11 +84,14 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     def forward(self, x, emb, context=None):
         for layer in self:
             if isinstance(layer, TimestepBlock):
+                # print(' + SHOWTE EMB ', layer.__class__.__name__, next(layer.parameters()).device)
                 x = layer(x, emb)
             elif isinstance(layer, SpatialTransformer):
                 x = layer(x, context)
+                # print(' + SHOWTE CTX ', layer.__class__.__name__, next(layer.parameters()).device)
             else:
                 x = layer(x)
+                # print(' + SHOWTE NON ', layer.__class__.__name__, next(layer.parameters()).device)
         return x
 
 
@@ -524,6 +531,9 @@ class UNetModel(nn.Module):
         input_block_chans = [model_channels]
         ch = model_channels
         ds = 1
+        print(' -- Building UNetModel:')
+        print(' -- Chns:', channel_mult, model_channels)
+        print(' -- NRES:', num_res_blocks)
         for level, mult in enumerate(channel_mult):
             for _ in range(num_res_blocks):
                 layers = [
@@ -678,6 +688,7 @@ class UNetModel(nn.Module):
                     ds //= 2
                 self.output_blocks.append(TimestepEmbedSequential(*layers))
                 self._feature_size += ch
+        # self.output_blocks = self.output_blocks.to('cuda')
 
         self.out = nn.Sequential(
             normalization(ch),
@@ -690,6 +701,14 @@ class UNetModel(nn.Module):
             conv_nd(dims, model_channels, n_embed, 1),
             #nn.LogSoftmax(dim=1)  # change to cross_entropy and produce non-normalized logits
         )
+
+        print(' -- TOT', _num_params_of_model(self.input_blocks), _num_params_of_model(self.middle_block), _num_params_of_model(self.output_blocks))
+        for model in self.input_blocks:
+            print(' -- INP ', 'size=', _num_params_of_model(model))
+        for model in self.middle_block:
+            print(' -- MID ', 'size=', _num_params_of_model(model))
+        for model in self.output_blocks:
+            print(' -- OUT ', 'size=', _num_params_of_model(model))
 
     def convert_to_fp16(self):
         """
@@ -728,10 +747,43 @@ class UNetModel(nn.Module):
             emb = emb + self.label_emb(y)
 
         h = x.type(self.dtype)
-        for module in self.input_blocks:
-            h = module(h, emb, context)
-            hs.append(h)
+
+        h = h.to('cuda')
+        emb = emb.to('cuda')
+        context = context.to('cuda')
+        # if next(self.input_blocks.parameters()).device == th.device('cpu'):
+            # self.input_blocks = self.input_blocks.to('cuda')
+        
+        # for module in self.input_blocks:
+        MYRANGE = 4
+        for idx in range(len(self.input_blocks)):
+            module = self.input_blocks[idx]
+            if idx <= MYRANGE:
+                if next(module.parameters()).device == th.device('cpu'):
+                    print(' ** mov', idx)
+                    module = module.to('cuda')
+                    self.input_blocks[idx] = module
+                h = module(h, emb, context)
+                hs.append(h.to('cpu'))
+            else:
+                if idx == MYRANGE + 1:
+                    h = h.to('cpu')
+                    emb = emb.to('cpu')
+                    context = context.to('cpu')
+                h = module(h, emb, context)
+                hs.append(h)
+
         h = self.middle_block(h, emb, context)
+
+        # h = h.to('cuda')
+        # emb = emb.to('cuda')
+        # context = context.to('cuda')
+        # print('  * device:', h.device, emb.device, context.device)
+        # 
+        #     print('  * move to cuda')
+        #     self.output_blocks = self.output_blocks.to('cuda')
+        # h = h.to('cpu')
+
         for module in self.output_blocks:
             h = th.cat([h, hs.pop()], dim=1)
             h = module(h, emb, context)
