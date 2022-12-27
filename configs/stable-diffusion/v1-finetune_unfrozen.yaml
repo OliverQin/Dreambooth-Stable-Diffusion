@@ -80,23 +80,22 @@ data:
     num_workers: 2
     wrap: false
     train:
-      target: ldm.data.personalized.PersonalizedBase
+      target: ldm.data.personalized_custom_titles.PersonalizedBase
       params:
         size: 512
         set: train
         per_image_tokens: false
-        repeats: 11
+        repeats: 7
     reg:
-      target: ldm.data.personalized.PersonalizedBase
+      target: ldm.data.personalized_custom_titles.PersonalizedBase
       params:
         size: 512
         set: train
         reg: true
         per_image_tokens: false
-        repeats: 4
-        
+        repeats: 7
     validation:
-      target: ldm.data.personalized.PersonalizedBase
+      target: ldm.data.personalized_custom_titles.PersonalizedBase
       params:
         size: 512
         set: val
