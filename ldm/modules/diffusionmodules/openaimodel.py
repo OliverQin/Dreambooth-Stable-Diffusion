@@ -747,46 +747,34 @@ class UNetModel(nn.Module):
             emb = emb + self.label_emb(y)
 
         h = x.type(self.dtype)
+        for module in self.input_blocks:
+            h = module(h, emb, context)
+            hs.append(h)
+        h = self.middle_block(h, emb, context)
 
+        MYRANGE = 2
         h = h.to('cuda')
         emb = emb.to('cuda')
         context = context.to('cuda')
-        # if next(self.input_blocks.parameters()).device == th.device('cpu'):
-            # self.input_blocks = self.input_blocks.to('cuda')
-        
-        # for module in self.input_blocks:
-        MYRANGE = 4
-        for idx in range(len(self.input_blocks)):
-            module = self.input_blocks[idx]
+        for idx in range(len(self.output_blocks)):
+            module = self.output_blocks[idx]
             if idx <= MYRANGE:
                 if next(module.parameters()).device == th.device('cpu'):
                     print(' ** mov', idx)
                     module = module.to('cuda')
-                    self.input_blocks[idx] = module
-                h = module(h, emb, context)
-                hs.append(h.to('cpu'))
+                    self.output_blocks[idx] = module
+                
+                h = th.cat([h, hs.pop().to('cuda')], dim=1)
+                with th.autocast('cuda'):
+                    h = module(h, emb, context)
             else:
                 if idx == MYRANGE + 1:
                     h = h.to('cpu')
                     emb = emb.to('cpu')
                     context = context.to('cpu')
+                h = th.cat([h, hs.pop()], dim=1)
                 h = module(h, emb, context)
-                hs.append(h)
-
-        h = self.middle_block(h, emb, context)
-
-        # h = h.to('cuda')
-        # emb = emb.to('cuda')
-        # context = context.to('cuda')
-        # print('  * device:', h.device, emb.device, context.device)
-        # 
-        #     print('  * move to cuda')
-        #     self.output_blocks = self.output_blocks.to('cuda')
-        # h = h.to('cpu')
-
-        for module in self.output_blocks:
-            h = th.cat([h, hs.pop()], dim=1)
-            h = module(h, emb, context)
+        
         h = h.type(x.dtype)
         if self.predict_codebook_ids:
             return self.id_predictor(h)
